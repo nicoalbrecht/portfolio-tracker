@@ -1,7 +1,9 @@
 "use client";
 
+import { useMemo, memo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useStore } from "@/stores";
+import { useActivePortfolio } from "@/hooks";
+import { EmptyState, PortfolioIcon } from "@/components/ui/empty-state";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import { Quote } from "@/types";
 import { TrendingUp, TrendingDown, DollarSign } from "lucide-react";
@@ -10,15 +12,12 @@ interface PortfolioSummaryProps {
   quotes?: Record<string, Quote>;
 }
 
-export function PortfolioSummary({ quotes = {} }: PortfolioSummaryProps) {
-  const portfolio = useStore((state) => {
-    const active = state.portfolios.find((p) => p.id === state.activePortfolioId);
-    return active;
-  });
+export const PortfolioSummary = memo(function PortfolioSummary({ quotes = {} }: PortfolioSummaryProps) {
+  const portfolio = useActivePortfolio();
 
-  const holdings = portfolio?.holdings ?? [];
+  const holdings = useMemo(() => portfolio?.holdings ?? [], [portfolio?.holdings]);
 
-  const calculations = holdings.reduce(
+  const calculations = useMemo(() => holdings.reduce(
     (acc, holding) => {
       const quote = quotes[holding.symbol];
       const currentPrice = quote?.price ?? holding.avgCostBasis;
@@ -33,17 +32,18 @@ export function PortfolioSummary({ quotes = {} }: PortfolioSummaryProps) {
       };
     },
     { totalValue: 0, totalCost: 0, dayChange: 0 }
-  );
+  ), [holdings, quotes]);
 
-  const totalGainLoss = calculations.totalValue - calculations.totalCost;
-  const totalGainLossPercent =
-    calculations.totalCost > 0
-      ? (totalGainLoss / calculations.totalCost) * 100
+  const { totalGainLoss, totalGainLossPercent, dayChangePercent } = useMemo(() => {
+    const gainLoss = calculations.totalValue - calculations.totalCost;
+    const gainLossPercent = calculations.totalCost > 0
+      ? (gainLoss / calculations.totalCost) * 100
       : 0;
-  const dayChangePercent =
-    calculations.totalValue - calculations.dayChange > 0
+    const dayPct = calculations.totalValue - calculations.dayChange > 0
       ? (calculations.dayChange / (calculations.totalValue - calculations.dayChange)) * 100
       : 0;
+    return { totalGainLoss: gainLoss, totalGainLossPercent: gainLossPercent, dayChangePercent: dayPct };
+  }, [calculations]);
 
   const isPositiveDay = calculations.dayChange >= 0;
   const isPositiveTotal = totalGainLoss >= 0;
@@ -56,10 +56,12 @@ export function PortfolioSummary({ quotes = {} }: PortfolioSummaryProps) {
           <DollarSign className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
-          <div className="text-2xl font-bold font-mono-numbers">$0.00</div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Add holdings to see your portfolio value
-          </p>
+          <EmptyState
+            icon={<PortfolioIcon className="h-8 w-8" />}
+            title="No holdings"
+            description="Add your first holding to get started"
+            className="py-4"
+          />
         </CardContent>
       </Card>
     );
@@ -126,4 +128,4 @@ export function PortfolioSummary({ quotes = {} }: PortfolioSummaryProps) {
       </CardContent>
     </Card>
   );
-}
+});

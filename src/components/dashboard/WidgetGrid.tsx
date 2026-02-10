@@ -16,6 +16,17 @@ interface WidgetGridProps {
   children: ReactNode;
 }
 
+const convertLayout = (layout: LayoutItem): WidgetLayout => ({
+  i: layout.i,
+  x: layout.x,
+  y: layout.y,
+  w: layout.w,
+  h: layout.h,
+  minW: layout.minW,
+  minH: layout.minH,
+  static: layout.static,
+});
+
 export function WidgetGrid({ children }: WidgetGridProps) {
   const { width, containerRef, mounted } = useContainerWidth();
   const { layouts, updateLayouts } = useStore();
@@ -32,17 +43,6 @@ export function WidgetGrid({ children }: WidgetGridProps) {
     },
     [layouts, updateLayouts]
   );
-
-  const convertLayout = (layout: LayoutItem): WidgetLayout => ({
-    i: layout.i,
-    x: layout.x,
-    y: layout.y,
-    w: layout.w,
-    h: layout.h,
-    minW: layout.minW,
-    minH: layout.minH,
-    static: layout.static,
-  });
 
   return (
     <div ref={containerRef} className={isDragging ? "cursor-grabbing" : ""}>

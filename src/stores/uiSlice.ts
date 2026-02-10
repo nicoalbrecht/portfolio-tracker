@@ -1,29 +1,54 @@
 import { StateCreator } from "zustand";
 
+const MAX_SYMBOL_LENGTH = 10;
+const SYMBOL_REGEX = /^[A-Z0-9.]+$/;
+
+/** Watchlist entry with symbol and timestamp */
 export interface WatchlistItem {
+  /** Stock/ETF symbol (uppercase) */
   symbol: string;
+  /** ISO timestamp when added */
   addedAt: string;
 }
 
+/**
+ * UI state slice for theme and watchlist management.
+ */
 export interface UISlice {
+  /** Current color theme */
   theme: "dark" | "light";
-  sidebarOpen: boolean;
-  activeModal: string | null;
+  /** User's watchlist of tracked symbols */
   watchlist: WatchlistItem[];
 
+  /**
+   * Sets the application theme.
+   * Updates the DOM classList for CSS theming.
+   * @param theme - Theme to apply
+   */
   setTheme: (theme: "dark" | "light") => void;
+
+  /**
+   * Toggles between dark and light themes.
+   */
   toggleTheme: () => void;
-  setSidebarOpen: (open: boolean) => void;
-  openModal: (modalId: string) => void;
-  closeModal: () => void;
+
+  /**
+   * Adds a symbol to the watchlist.
+   * Symbol is uppercased and validated.
+   * @param symbol - Stock/ETF symbol (max 10 chars, alphanumeric with dots)
+   * @throws Error if symbol is empty, too long, or contains invalid characters
+   */
   addToWatchlist: (symbol: string) => void;
+
+  /**
+   * Removes a symbol from the watchlist.
+   * @param symbol - Symbol to remove (case-insensitive)
+   */
   removeFromWatchlist: (symbol: string) => void;
 }
 
 export const createUISlice: StateCreator<UISlice> = (set) => ({
   theme: "dark",
-  sidebarOpen: true,
-  activeModal: null,
   watchlist: [],
 
   setTheme: (theme) => {
@@ -43,12 +68,19 @@ export const createUISlice: StateCreator<UISlice> = (set) => ({
     });
   },
 
-  setSidebarOpen: (open) => set({ sidebarOpen: open }),
-  openModal: (modalId) => set({ activeModal: modalId }),
-  closeModal: () => set({ activeModal: null }),
-
   addToWatchlist: (symbol) => {
-    const upperSymbol = symbol.toUpperCase();
+    const upperSymbol = symbol.trim().toUpperCase();
+    
+    if (!upperSymbol) {
+      throw new Error("Symbol cannot be empty");
+    }
+    if (upperSymbol.length > MAX_SYMBOL_LENGTH) {
+      throw new Error(`Symbol cannot exceed ${MAX_SYMBOL_LENGTH} characters`);
+    }
+    if (!SYMBOL_REGEX.test(upperSymbol)) {
+      throw new Error("Symbol can only contain uppercase letters, numbers, and dots");
+    }
+    
     set((state) => {
       if (state.watchlist.some((w) => w.symbol === upperSymbol)) {
         return state;

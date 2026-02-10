@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Dashboard, AddWidgetModal } from "@/components/dashboard";
 import { AddHoldingForm } from "@/components/portfolio/AddHoldingForm";
-import { useStore } from "@/stores";
-import { useQuotes } from "@/hooks";
+import { ErrorBoundary } from "@/components/error-boundary";
+import { DashboardSkeleton } from "@/components/loading";
+import { useQuotes, useActivePortfolio } from "@/hooks";
 import { Plus, RefreshCw, LayoutGrid } from "lucide-react";
 import { ThemeToggle, SavedViews, PortfolioSwitcher, DataManagement } from "@/components/layout";
 
@@ -13,10 +14,7 @@ export default function Home() {
   const [addHoldingOpen, setAddHoldingOpen] = useState(false);
   const [addWidgetOpen, setAddWidgetOpen] = useState(false);
 
-  const portfolio = useStore((state) => {
-    const active = state.portfolios.find((p) => p.id === state.activePortfolioId);
-    return active;
-  });
+  const portfolio = useActivePortfolio();
 
   const symbols = portfolio?.holdings.map((h) => h.symbol) ?? [];
   const { isLoading, refetch } = useQuotes(symbols);
@@ -58,8 +56,12 @@ export default function Home() {
         </div>
       </header>
 
-      <main className="container mx-auto px-4 py-6">
-        <Dashboard onRefresh={() => refetch()} isLoading={isLoading} />
+      <main id="main-content" className="container mx-auto px-4 py-6">
+        <ErrorBoundary>
+          <Suspense fallback={<DashboardSkeleton />}>
+            <Dashboard onRefresh={() => refetch()} isLoading={isLoading} />
+          </Suspense>
+        </ErrorBoundary>
       </main>
 
       <AddHoldingForm open={addHoldingOpen} onOpenChange={setAddHoldingOpen} />

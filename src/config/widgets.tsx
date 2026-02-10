@@ -18,10 +18,17 @@ import {
   PerformanceChart,
   PriceChart,
   Watchlist,
+  PortfolioSummarySkeleton,
+  HoldingsTableSkeleton,
+  AllocationChartSkeleton,
+  PerformanceChartSkeleton,
+  PriceChartSkeleton,
+  WatchlistSkeleton,
 } from "@/components/widgets";
 
 export interface WidgetRegistryEntry {
-  component: ComponentType<{ widgetId: string; quotes?: Record<string, Quote> }>;
+  component: ComponentType<{ quotes?: Record<string, Quote> }>;
+  skeleton: ComponentType;
   title: string;
   icon: LucideIcon;
   defaultSize: { w: number; h: number; minW: number; minH: number };
@@ -29,7 +36,7 @@ export interface WidgetRegistryEntry {
   available: boolean;
 }
 
-function PlaceholderWidget({ title }: { title: string; widgetId: string }) {
+function PlaceholderWidget({ title }: { title: string }) {
   return (
     <div className="flex items-center justify-center h-full text-muted-foreground">
       <p className="text-sm">{title} - Coming Soon</p>
@@ -37,39 +44,48 @@ function PlaceholderWidget({ title }: { title: string; widgetId: string }) {
   );
 }
 
+function PlaceholderSkeleton() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <div className="animate-pulse bg-accent rounded h-8 w-32" />
+    </div>
+  );
+}
+
 const WatchlistWidget = () => (
   <Watchlist />
 );
-const DividendsWidget = ({ widgetId }: { widgetId: string }) => (
-  <PlaceholderWidget title="Dividends" widgetId={widgetId} />
+const DividendsWidget = () => (
+  <PlaceholderWidget title="Dividends" />
 );
-const NewsFeed = ({ widgetId }: { widgetId: string }) => (
-  <PlaceholderWidget title="News Feed" widgetId={widgetId} />
+const NewsFeed = () => (
+  <PlaceholderWidget title="News Feed" />
 );
 
-const PortfolioSummaryWidget = ({ quotes }: { widgetId: string; quotes?: Record<string, Quote> }) => (
+const PortfolioSummaryWidget = ({ quotes }: { quotes?: Record<string, Quote> }) => (
   <PortfolioSummary quotes={quotes} />
 );
 
-const HoldingsTableWidget = ({ quotes }: { widgetId: string; quotes?: Record<string, Quote> }) => (
+const HoldingsTableWidget = ({ quotes }: { quotes?: Record<string, Quote> }) => (
   <HoldingsTable quotes={quotes} />
 );
 
-const AllocationChartWidget = ({ quotes }: { widgetId: string; quotes?: Record<string, Quote> }) => (
+const AllocationChartWidget = ({ quotes }: { quotes?: Record<string, Quote> }) => (
   <AllocationChart quotes={quotes} />
 );
 
-const PerformanceChartWidget = ({ quotes }: { widgetId: string; quotes?: Record<string, Quote> }) => (
+const PerformanceChartWidget = ({ quotes }: { quotes?: Record<string, Quote> }) => (
   <PerformanceChart quotes={quotes} />
 );
 
-const PriceChartWidget = ({ quotes }: { widgetId: string; quotes?: Record<string, Quote> }) => (
+const PriceChartWidget = ({ quotes }: { quotes?: Record<string, Quote> }) => (
   <PriceChart quotes={quotes} />
 );
 
 export const WIDGET_REGISTRY: Record<WidgetType, WidgetRegistryEntry> = {
   "portfolio-summary": {
     component: PortfolioSummaryWidget,
+    skeleton: PortfolioSummarySkeleton,
     title: "Portfolio Summary",
     icon: DollarSign,
     defaultSize: { w: 4, h: 2, minW: 3, minH: 2 },
@@ -78,6 +94,7 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetRegistryEntry> = {
   },
   "holdings-table": {
     component: HoldingsTableWidget,
+    skeleton: HoldingsTableSkeleton,
     title: "Holdings",
     icon: TableIcon,
     defaultSize: { w: 8, h: 4, minW: 6, minH: 3 },
@@ -86,6 +103,7 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetRegistryEntry> = {
   },
   "allocation-chart": {
     component: AllocationChartWidget,
+    skeleton: AllocationChartSkeleton,
     title: "Allocation",
     icon: PieChart,
     defaultSize: { w: 4, h: 4, minW: 3, minH: 3 },
@@ -94,6 +112,7 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetRegistryEntry> = {
   },
   "performance-chart": {
     component: PerformanceChartWidget,
+    skeleton: PerformanceChartSkeleton,
     title: "Performance",
     icon: TrendingUp,
     defaultSize: { w: 8, h: 4, minW: 4, minH: 3 },
@@ -102,6 +121,7 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetRegistryEntry> = {
   },
   watchlist: {
     component: WatchlistWidget,
+    skeleton: WatchlistSkeleton,
     title: "Watchlist",
     icon: Eye,
     defaultSize: { w: 4, h: 4, minW: 3, minH: 3 },
@@ -110,6 +130,7 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetRegistryEntry> = {
   },
   "price-chart": {
     component: PriceChartWidget,
+    skeleton: PriceChartSkeleton,
     title: "Price Chart",
     icon: CandlestickChart,
     defaultSize: { w: 6, h: 4, minW: 4, minH: 3 },
@@ -118,6 +139,7 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetRegistryEntry> = {
   },
   dividends: {
     component: DividendsWidget,
+    skeleton: PlaceholderSkeleton,
     title: "Dividends",
     icon: Coins,
     defaultSize: { w: 4, h: 3, minW: 3, minH: 2 },
@@ -126,6 +148,7 @@ export const WIDGET_REGISTRY: Record<WidgetType, WidgetRegistryEntry> = {
   },
   "news-feed": {
     component: NewsFeed,
+    skeleton: PlaceholderSkeleton,
     title: "News Feed",
     icon: Newspaper,
     defaultSize: { w: 4, h: 4, minW: 3, minH: 3 },

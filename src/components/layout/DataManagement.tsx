@@ -12,36 +12,54 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Download, HardDrive, Upload } from "lucide-react";
 import { toast } from "sonner";
+import { z } from "zod";
+
+const importDataSchema = z.object({
+  version: z.number(),
+  exportedAt: z.string().optional(),
+  data: z.object({
+    portfolios: z.array(z.unknown()).optional(),
+    transactions: z.array(z.unknown()).optional(),
+    layouts: z.object({
+      lg: z.array(z.unknown()),
+      md: z.array(z.unknown()),
+      sm: z.array(z.unknown()),
+    }).optional(),
+    widgets: z.array(z.unknown()).optional(),
+    savedViews: z.array(z.unknown()).optional(),
+    activePortfolioId: z.string().nullable().optional(),
+    activeViewId: z.string().nullable().optional(),
+    watchlist: z.array(z.unknown()).optional(),
+    theme: z.enum(["dark", "light"]).optional(),
+  }),
+});
+
+const selectExportData = (state: ReturnType<typeof useStore.getState>) => ({
+  portfolios: state.portfolios,
+  transactions: state.transactions,
+  layouts: state.layouts,
+  widgets: state.widgets,
+  savedViews: state.savedViews,
+  activePortfolioId: state.activePortfolioId,
+  activeViewId: state.activeViewId,
+  watchlist: state.watchlist,
+  theme: state.theme,
+});
 
 export function DataManagement() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const portfolios = useStore((state) => state.portfolios);
-  const transactions = useStore((state) => state.transactions);
-  const layouts = useStore((state) => state.layouts);
-  const widgets = useStore((state) => state.widgets);
-  const savedViews = useStore((state) => state.savedViews);
-  const activePortfolioId = useStore((state) => state.activePortfolioId);
-  const activeViewId = useStore((state) => state.activeViewId);
-  const watchlist = useStore((state) => state.watchlist);
+  const storeData = useStore(selectExportData);
+  const importState = useStore((state) => state.importState);
 
   const handleExport = () => {
-    const exportData = {
+    const exportPayload = {
       version: 1,
       exportedAt: new Date().toISOString(),
-      data: {
-        portfolios,
-        transactions,
-        layouts,
-        widgets,
-        savedViews,
-        activePortfolioId,
-        activeViewId,
-        watchlist,
-      },
+      data: storeData,
     };
 
-    const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+    const blob = new Blob([JSON.stringify(exportPayload, null, 2)], {
       type: "application/json",
     });
     const url = URL.createObjectURL(blob);
@@ -64,37 +82,28 @@ export function DataManagement() {
     reader.onload = (e) => {
       try {
         const content = e.target?.result as string;
-        const importData = JSON.parse(content);
+        const rawData = JSON.parse(content);
 
-        if (!importData.version || !importData.data) {
-          throw new Error("Invalid backup file format");
+        const parsed = importDataSchema.safeParse(rawData);
+        if (!parsed.success) {
+          throw new Error("Invalid backup file format: " + parsed.error.message);
         }
 
-        const { data } = importData;
-        
-        const defaultLayouts = {
-          lg: [],
-          md: [],
-          sm: [],
-        };
-        
-        const storeData = {
-          portfolios: Array.isArray(data.portfolios) ? data.portfolios : [],
-          transactions: Array.isArray(data.transactions) ? data.transactions : [],
-          layouts: data.layouts && data.layouts.lg && data.layouts.md && data.layouts.sm 
-            ? data.layouts 
-            : defaultLayouts,
-          widgets: Array.isArray(data.widgets) ? data.widgets : [],
-          savedViews: Array.isArray(data.savedViews) ? data.savedViews : [],
-          activePortfolioId: data.activePortfolioId ?? null,
-          activeViewId: data.activeViewId ?? null,
-          watchlist: Array.isArray(data.watchlist) ? data.watchlist : [],
-          theme: "dark",
-        };
+        const { data } = parsed.data;
 
-        localStorage.setItem("etf-dashboard-storage", JSON.stringify({ state: storeData }));
-        toast.success("Data imported successfully. Refreshing...");
-        setTimeout(() => window.location.reload(), 1000);
+        importState({
+          portfolios: data.portfolios,
+          transactions: data.transactions,
+          layouts: data.layouts,
+          widgets: data.widgets,
+          savedViews: data.savedViews,
+          activePortfolioId: data.activePortfolioId,
+          activeViewId: data.activeViewId,
+          watchlist: data.watchlist,
+          theme: data.theme,
+        });
+
+        toast.success("Data imported successfully");
       } catch (error) {
         toast.error("Failed to import data: " + (error instanceof Error ? error.message : "Unknown error"));
       }

@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, memo } from "react";
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend } from "recharts";
-import { useStore } from "@/stores";
+import { useActivePortfolio } from "@/hooks";
+import { EmptyState, PieChartIcon } from "@/components/ui/empty-state";
 import { Quote } from "@/types";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 
@@ -23,13 +24,10 @@ const COLORS = [
   "#6366f1",
 ];
 
-export function AllocationChart({ quotes = {} }: AllocationChartProps) {
-  const portfolio = useStore((state) => {
-    const active = state.portfolios.find((p) => p.id === state.activePortfolioId);
-    return active;
-  });
+export const AllocationChart = memo(function AllocationChart({ quotes = {} }: AllocationChartProps) {
+  const portfolio = useActivePortfolio();
 
-  const holdings = portfolio?.holdings ?? [];
+  const holdings = useMemo(() => portfolio?.holdings ?? [], [portfolio?.holdings]);
 
   const chartData = useMemo(() => {
     if (holdings.length === 0) return [];
@@ -61,16 +59,22 @@ export function AllocationChart({ quotes = {} }: AllocationChartProps) {
 
   if (holdings.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        <p className="text-sm">Add holdings to see allocation</p>
-      </div>
+      <EmptyState
+        icon={<PieChartIcon />}
+        title="No allocation data"
+        description="Add holdings to see your portfolio allocation"
+        className="h-full"
+      />
     );
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" role="figure" aria-label="Portfolio allocation pie chart">
+      <span className="sr-only">
+        Portfolio allocation breakdown: {chartData.map(d => `${d.name} ${d.percentage.toFixed(1)}%`).join(", ")}
+      </span>
       <ResponsiveContainer width="100%" height="100%">
-        <PieChart>
+        <PieChart aria-hidden="true">
           <Pie
             data={chartData}
             cx="50%"
@@ -120,7 +124,7 @@ export function AllocationChart({ quotes = {} }: AllocationChartProps) {
             layout="vertical"
             align="right"
             verticalAlign="middle"
-            formatter={(value, entry) => {
+            formatter={(value) => {
               const data = chartData.find((d) => d.name === value);
               return (
                 <span className="text-sm">
@@ -138,4 +142,4 @@ export function AllocationChart({ quotes = {} }: AllocationChartProps) {
       </div>
     </div>
   );
-}
+});

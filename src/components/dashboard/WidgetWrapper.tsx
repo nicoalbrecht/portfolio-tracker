@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { ErrorBoundary } from "@/components/error-boundary";
 import { GripVertical, Settings, X, RefreshCw, MoreVertical } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -87,7 +88,9 @@ export function WidgetWrapper({
         </div>
       </CardHeader>
       <CardContent className="flex-1 overflow-auto p-4">
-        {children}
+        <ErrorBoundary inline>
+          {children}
+        </ErrorBoundary>
       </CardContent>
     </Card>
   );

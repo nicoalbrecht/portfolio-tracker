@@ -1,5 +1,9 @@
 import { StateCreator } from "zustand";
 import { DashboardConfig, WidgetInstance, WidgetLayout, SavedView } from "@/types";
+import { UISlice } from "./uiSlice";
+
+const MAX_VIEW_NAME_LENGTH = 50;
+const VIEW_NAME_REGEX = /^[a-zA-Z0-9\s\-_]+$/;
 
 const DEFAULT_LAYOUTS: DashboardConfig["layouts"] = {
   lg: [
@@ -19,33 +23,90 @@ const DEFAULT_LAYOUTS: DashboardConfig["layouts"] = {
   ],
 };
 
-const DEFAULT_WIDGETS: WidgetInstance[] = [
+const getDefaultWidgets = (): WidgetInstance[] => [
   { id: "portfolio-summary", type: "portfolio-summary", settings: {}, addedAt: new Date().toISOString() },
   { id: "allocation-chart", type: "allocation-chart", settings: {}, addedAt: new Date().toISOString() },
   { id: "holdings-table", type: "holdings-table", settings: {}, addedAt: new Date().toISOString() },
 ];
 
+/**
+ * Dashboard layout and widget management slice.
+ * Handles responsive layouts, widget instances, and saved view configurations.
+ */
 export interface DashboardSlice {
+  /** Responsive grid layouts for lg/md/sm breakpoints */
   layouts: DashboardConfig["layouts"];
+  /** Active widget instances on the dashboard */
   widgets: WidgetInstance[];
+  /** User-saved dashboard view configurations */
   savedViews: SavedView[];
+  /** Currently loaded saved view ID */
   activeViewId: string | null;
 
+  /**
+   * Updates all responsive layouts (lg, md, sm).
+   * Called by react-grid-layout on drag/resize.
+   * @param layouts - New layouts for all breakpoints
+   */
   updateLayouts: (layouts: DashboardConfig["layouts"]) => void;
+
+  /**
+   * Adds a new widget to the dashboard.
+   * Automatically positions it and creates layout entries for all breakpoints.
+   * @param type - Widget type from registry (e.g., "portfolio-summary")
+   * @param settings - Optional widget-specific settings
+   */
   addWidget: (type: WidgetInstance["type"], settings?: Record<string, unknown>) => void;
+
+  /**
+   * Removes a widget from the dashboard.
+   * @param id - Widget instance ID
+   */
   removeWidget: (id: string) => void;
+
+  /**
+   * Updates settings for a specific widget.
+   * @param id - Widget instance ID
+   * @param settings - Settings to merge with existing
+   */
   updateWidgetSettings: (id: string, settings: Record<string, unknown>) => void;
 
+  /**
+   * Saves current layout and widgets as a named view.
+   * @param name - View name (max 50 chars, alphanumeric with spaces/hyphens/underscores)
+   * @returns The new view's ID
+   * @throws Error if name is empty, too long, or contains invalid characters
+   */
   saveView: (name: string) => string;
+
+  /**
+   * Loads a saved view, replacing current layouts and widgets.
+   * @param id - Saved view ID
+   */
   loadView: (id: string) => void;
+
+  /**
+   * Deletes a saved view.
+   * If it was the default, promotes another view to default.
+   * @param id - Saved view ID
+   */
   deleteView: (id: string) => void;
+
+  /**
+   * Sets a view as the default (loaded on startup).
+   * @param id - Saved view ID
+   */
   setDefaultView: (id: string) => void;
+
+  /**
+   * Resets layouts and widgets to factory defaults.
+   */
   resetToDefaults: () => void;
 }
 
-export const createDashboardSlice: StateCreator<DashboardSlice> = (set, get) => ({
+export const createDashboardSlice: StateCreator<DashboardSlice & UISlice, [], [], DashboardSlice> = (set, get) => ({
   layouts: DEFAULT_LAYOUTS,
-  widgets: DEFAULT_WIDGETS,
+  widgets: getDefaultWidgets(),
   savedViews: [],
   activeViewId: null,
 
@@ -105,20 +166,32 @@ export const createDashboardSlice: StateCreator<DashboardSlice> = (set, get) => 
   },
 
   saveView: (name) => {
+    const trimmedName = name.trim();
+    
+    if (!trimmedName) {
+      throw new Error("View name cannot be empty");
+    }
+    if (trimmedName.length > MAX_VIEW_NAME_LENGTH) {
+      throw new Error(`View name cannot exceed ${MAX_VIEW_NAME_LENGTH} characters`);
+    }
+    if (!VIEW_NAME_REGEX.test(trimmedName)) {
+      throw new Error("View name can only contain letters, numbers, spaces, hyphens, and underscores");
+    }
+    
     const id = crypto.randomUUID();
     const now = new Date().toISOString();
-    const { layouts, widgets, savedViews } = get();
+    const { layouts, widgets, savedViews, theme } = get();
 
     const newView: SavedView = {
       id,
-      name,
+      name: trimmedName,
       isDefault: savedViews.length === 0,
       createdAt: now,
       updatedAt: now,
       config: {
-        layouts: JSON.parse(JSON.stringify(layouts)),
-        widgets: JSON.parse(JSON.stringify(widgets)),
-        theme: "dark",
+        layouts: structuredClone(layouts),
+        widgets: structuredClone(widgets),
+        theme,
         accentColor: "emerald",
       },
     };
@@ -137,8 +210,8 @@ export const createDashboardSlice: StateCreator<DashboardSlice> = (set, get) => 
       const { layouts, widgets } = view.config;
       if (layouts.lg && layouts.md && layouts.sm && Array.isArray(widgets)) {
         set({
-          layouts: JSON.parse(JSON.stringify(layouts)),
-          widgets: JSON.parse(JSON.stringify(widgets)),
+          layouts: structuredClone(layouts),
+          widgets: structuredClone(widgets),
           activeViewId: id,
         });
       }
@@ -173,7 +246,7 @@ export const createDashboardSlice: StateCreator<DashboardSlice> = (set, get) => 
   resetToDefaults: () => {
     set({
       layouts: DEFAULT_LAYOUTS,
-      widgets: DEFAULT_WIDGETS,
+      widgets: getDefaultWidgets(),
     });
   },
 });

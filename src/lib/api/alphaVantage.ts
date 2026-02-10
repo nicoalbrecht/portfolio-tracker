@@ -1,106 +1,165 @@
 import { Quote } from "@/types";
+import { ApiError } from "./errors";
 
-const ALPHA_VANTAGE_BASE_URL = "https://www.alphavantage.co/query";
+const DEFAULT_TIMEOUT_MS = 10000;
+const MAX_RETRIES = 3;
+const BASE_DELAY_MS = 1000;
 
-export interface AlphaVantageQuote {
-  "Global Quote": {
-    "01. symbol": string;
-    "02. open": string;
-    "03. high": string;
-    "04. low": string;
-    "05. price": string;
-    "06. volume": string;
-    "07. latest trading day": string;
-    "08. previous close": string;
-    "09. change": string;
-    "10. change percent": string;
-  };
+/** Response from the /api/quotes endpoint */
+export interface QuotesResponse {
+  /** Successfully fetched quotes keyed by symbol */
+  quotes: Record<string, Quote>;
+  /** Symbols that failed to fetch with error messages */
+  errors?: Record<string, string>;
 }
 
-export interface AlphaVantageSearchResult {
-  bestMatches: Array<{
-    "1. symbol": string;
-    "2. name": string;
-    "3. type": string;
-    "4. region": string;
-    "5. marketOpen": string;
-    "6. marketClose": string;
-    "7. timezone": string;
-    "8. currency": string;
-    "9. matchScore": string;
-  }>;
+/** Single search result from symbol lookup */
+export interface SearchResult {
+  /** Stock/ETF ticker symbol */
+  symbol: string;
+  /** Company or fund name */
+  name: string;
+  /** Security type (e.g., "Equity", "ETF") */
+  type: string;
+  /** Trading region (e.g., "United States") */
+  region: string;
+  /** Currency code (e.g., "USD") */
+  currency: string;
 }
 
-function getApiKey(): string {
-  return process.env.NEXT_PUBLIC_ALPHA_VANTAGE_API_KEY ?? "demo";
+/** Response from the /api/search endpoint */
+export interface SearchResponse {
+  /** Matching search results */
+  results: SearchResult[];
+  /** Error message if search failed */
+  error?: string;
 }
 
-export async function fetchQuote(symbol: string): Promise<Quote | null> {
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
   try {
-    const apiKey = getApiKey();
-    const url = `${ALPHA_VANTAGE_BASE_URL}?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${apiKey}`;
-
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("Network error");
-
-    const data: AlphaVantageQuote = await response.json();
-    const quote = data["Global Quote"];
-
-    if (!quote || !quote["05. price"]) {
-      return null;
-    }
-
-    return {
-      symbol: quote["01. symbol"],
-      price: parseFloat(quote["05. price"]),
-      change: parseFloat(quote["09. change"]),
-      changePercent: parseFloat(quote["10. change percent"].replace("%", "")),
-      previousClose: parseFloat(quote["08. previous close"]),
-      timestamp: new Date().toISOString(),
-    };
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
   } catch (error) {
-    console.error(`Failed to fetch quote for ${symbol}:`, error);
-    return null;
+    if (error instanceof Error && error.name === "AbortError") {
+      throw ApiError.timeout();
+    }
+    throw ApiError.networkError(error instanceof Error ? error.message : undefined);
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
-export async function fetchBulkQuotes(symbols: string[]): Promise<Record<string, Quote>> {
-  const quotes: Record<string, Quote> = {};
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit = {},
+  maxRetries: number = MAX_RETRIES
+): Promise<Response> {
+  let lastError: Error | undefined;
 
-  const results = await Promise.allSettled(
-    symbols.map((symbol) => fetchQuote(symbol))
-  );
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetchWithTimeout(url, options);
 
-  results.forEach((result, index) => {
-    if (result.status === "fulfilled" && result.value) {
-      quotes[symbols[index]] = result.value;
+      if (response.status === 429) {
+        throw ApiError.fromResponse(response);
+      }
+
+      if (response.status >= 500) {
+        throw ApiError.fromResponse(response);
+      }
+
+      return response;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      const isRetryable = error instanceof ApiError && error.retryable;
+      const hasRetriesLeft = attempt < maxRetries;
+
+      if (isRetryable && hasRetriesLeft) {
+        const delay = BASE_DELAY_MS * Math.pow(2, attempt);
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        continue;
+      }
+
+      throw error;
     }
-  });
+  }
 
-  return quotes;
+  throw lastError ?? ApiError.networkError();
 }
 
-export async function searchSymbols(keywords: string): Promise<
-  Array<{ symbol: string; name: string; type: string }>
-> {
-  try {
-    const apiKey = getApiKey();
-    const url = `${ALPHA_VANTAGE_BASE_URL}?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(keywords)}&apikey=${apiKey}`;
+/**
+ * Fetches quotes for multiple symbols via the /api/quotes endpoint.
+ * Includes automatic retry with exponential backoff for transient failures.
+ * @param symbols - Array of stock/ETF symbols
+ * @returns Quotes response with successful quotes and any errors
+ * @throws ApiError on network failure or non-retryable errors
+ */
+export async function fetchQuotes(symbols: string[]): Promise<QuotesResponse> {
+  if (symbols.length === 0) {
+    return { quotes: {} };
+  }
 
-    const response = await fetch(url);
-    if (!response.ok) throw new Error("Network error");
+  const response = await fetchWithRetry(`/api/quotes?symbols=${symbols.join(",")}`);
 
-    const data: AlphaVantageSearchResult = await response.json();
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: "Network error" }));
+    throw ApiError.fromResponse(response, errorData.error);
+  }
 
-    if (!data.bestMatches) return [];
+  return response.json();
+}
 
-    return data.bestMatches.map((match) => ({
-      symbol: match["1. symbol"],
-      name: match["2. name"],
-      type: match["3. type"],
-    }));
-  } catch (error) {
-    console.error("Symbol search failed:", error);
+/**
+ * Fetches a single quote by symbol.
+ * @param symbol - Stock/ETF symbol
+ * @returns Quote data or null if not found
+ */
+export async function fetchQuote(symbol: string): Promise<Quote | null> {
+  const result = await fetchQuotes([symbol]);
+  return result.quotes[symbol] ?? null;
+}
+
+/**
+ * Fetches quotes for multiple symbols, returning only the quotes map.
+ * Used by useQuotes hook for React Query integration.
+ * @param symbols - Array of stock/ETF symbols
+ * @returns Record of quotes keyed by symbol
+ */
+export async function fetchBulkQuotes(symbols: string[]): Promise<Record<string, Quote>> {
+  const result = await fetchQuotes(symbols);
+  return result.quotes;
+}
+
+/**
+ * Searches for symbols matching a query string.
+ * Uses the /api/search endpoint with automatic retry.
+ * @param query - Search query (company name or symbol prefix)
+ * @returns Array of matching search results
+ * @throws ApiError on network failure or non-retryable errors
+ */
+export async function searchSymbols(query: string): Promise<SearchResult[]> {
+  if (!query.trim()) {
     return [];
   }
+
+  const response = await fetchWithRetry(`/api/search?q=${encodeURIComponent(query)}`);
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({ error: "Network error" }));
+    throw ApiError.fromResponse(response, errorData.error);
+  }
+
+  const data: SearchResponse = await response.json();
+  return data.results;
 }

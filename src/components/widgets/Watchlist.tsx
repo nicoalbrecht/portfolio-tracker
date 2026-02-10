@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useStore } from "@/stores";
 import { useQuotes } from "@/hooks";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus, Trash2, TrendingUp, TrendingDown, Minus } from "lucide-react";
+import { EmptyState, WatchlistIcon } from "@/components/ui/empty-state";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 
-export function Watchlist() {
+export const Watchlist = memo(function Watchlist() {
   const [symbol, setSymbol] = useState("");
 
   const watchlist = useStore((state) => state.watchlist);
@@ -27,14 +28,14 @@ export function Watchlist() {
   };
 
   const getTrendIcon = (change: number) => {
-    if (change > 0) return <TrendingUp className="h-4 w-4 text-green-500" />;
-    if (change < 0) return <TrendingDown className="h-4 w-4 text-red-500" />;
+    if (change > 0) return <TrendingUp className="h-4 w-4 text-emerald-500" />;
+    if (change < 0) return <TrendingDown className="h-4 w-4 text-rose-500" />;
     return <Minus className="h-4 w-4 text-muted-foreground" />;
   };
 
   const getChangeColor = (change: number) => {
-    if (change > 0) return "text-green-500";
-    if (change < 0) return "text-red-500";
+    if (change > 0) return "text-emerald-500";
+    if (change < 0) return "text-rose-500";
     return "text-muted-foreground";
   };
 
@@ -55,9 +56,12 @@ export function Watchlist() {
 
       <div className="flex-1 overflow-auto">
         {watchlist.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-muted-foreground text-sm">
-            Add symbols to your watchlist
-          </div>
+          <EmptyState
+            icon={<WatchlistIcon />}
+            title="No symbols tracked"
+            description="Add symbols to your watchlist to monitor prices"
+            className="h-full"
+          />
         ) : (
           <div className="space-y-1">
             {watchlist.map((item) => {
@@ -102,4 +106,4 @@ export function Watchlist() {
       </div>
     </div>
   );
-}
+});

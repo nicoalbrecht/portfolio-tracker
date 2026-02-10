@@ -1,28 +1,49 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { fetchBulkQuotes } from "@/lib/api";
 import { Quote } from "@/types";
-import { useStore } from "@/stores";
+import { toast } from "sonner";
+import { useActivePortfolio } from "./useActivePortfolio";
 
+/**
+ * Fetches real-time quotes for an array of symbols.
+ * Uses React Query with 60s stale time and automatic error toasts.
+ * @param symbols - Array of stock/ETF symbols to fetch
+ * @returns React Query result with quotes keyed by symbol
+ */
 export function useQuotes(symbols: string[]) {
-  const sortedKey = [...symbols].sort().join(",");
+  const sortedKey = useMemo(() => [...symbols].sort().join(","), [symbols]);
   
-  return useQuery<Record<string, Quote>>({
+  const query = useQuery<Record<string, Quote>>({
     queryKey: ["quotes", sortedKey],
     queryFn: () => fetchBulkQuotes(symbols),
     enabled: symbols.length > 0,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 60 * 1000,
     gcTime: 30 * 60 * 1000,
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
+    retry: 2,
   });
+
+  useEffect(() => {
+    if (query.error) {
+      toast.error("Failed to fetch quotes", {
+        description: query.error instanceof Error ? query.error.message : "Unknown error",
+      });
+    }
+  }, [query.error]);
+
+  return query;
 }
 
+/**
+ * Fetches quotes for all holdings in the active portfolio.
+ * Convenience wrapper around useQuotes that extracts symbols from holdings.
+ * @returns React Query result with quotes for portfolio holdings
+ */
 export function usePortfolioQuotes() {
-  const portfolio = useStore((state) => {
-    const active = state.portfolios.find((p) => p.id === state.activePortfolioId);
-    return active;
-  });
+  const portfolio = useActivePortfolio();
 
   const symbols = portfolio?.holdings.map((h) => h.symbol) ?? [];
 

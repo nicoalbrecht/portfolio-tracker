@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useId, memo } from "react";
 import {
   AreaChart,
   Area,
@@ -10,21 +10,21 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
-import { useStore } from "@/stores";
+import { useActivePortfolio } from "@/hooks";
+import { EmptyState, TrendIcon } from "@/components/ui/empty-state";
 import { Quote } from "@/types";
 import { formatCurrency } from "@/lib/formatters";
+import { createSeededRandom, hashString } from "@/lib/utils";
 
 interface PerformanceChartProps {
   quotes?: Record<string, Quote>;
 }
 
-export function PerformanceChart({ quotes = {} }: PerformanceChartProps) {
-  const portfolio = useStore((state) => {
-    const active = state.portfolios.find((p) => p.id === state.activePortfolioId);
-    return active;
-  });
+export const PerformanceChart = memo(function PerformanceChart({ quotes = {} }: PerformanceChartProps) {
+  const gradientId = useId();
+  const portfolio = useActivePortfolio();
 
-  const holdings = portfolio?.holdings ?? [];
+  const holdings = useMemo(() => portfolio?.holdings ?? [], [portfolio?.holdings]);
 
   const currentValue = useMemo(() => {
     return holdings.reduce((sum, holding) => {
@@ -46,13 +46,17 @@ export function PerformanceChart({ quotes = {} }: PerformanceChartProps) {
     const today = new Date();
     const data = [];
     
+    const symbolsKey = holdings.map(h => h.symbol).sort().join(",");
+    const seed = hashString(symbolsKey);
+    const random = createSeededRandom(seed);
+    
     for (let i = 30; i >= 0; i--) {
       const date = new Date(today);
       date.setDate(date.getDate() - i);
       
       const volatility = 0.02;
       const trend = (30 - i) / 30;
-      const randomFactor = 1 + (Math.random() - 0.5) * volatility * 2;
+      const randomFactor = 1 + (random() - 0.5) * volatility * 2;
       const trendFactor = costBasis > 0 
         ? 1 + (currentValue - costBasis) / costBasis * trend
         : 1;
@@ -67,7 +71,10 @@ export function PerformanceChart({ quotes = {} }: PerformanceChartProps) {
     }
     
     if (data.length > 0) {
-      data[data.length - 1].value = currentValue;
+      const lastPoint = data[data.length - 1];
+      if (lastPoint) {
+        lastPoint.value = currentValue;
+      }
     }
     
     return data;
@@ -89,14 +96,21 @@ export function PerformanceChart({ quotes = {} }: PerformanceChartProps) {
 
   if (holdings.length === 0) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        <p className="text-sm">Add holdings to see performance</p>
-      </div>
+      <EmptyState
+        icon={<TrendIcon />}
+        title="No performance data"
+        description="Add holdings to track your portfolio performance"
+        className="h-full"
+      />
     );
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col" role="figure" aria-label="Portfolio performance chart">
+      <span className="sr-only">
+        Portfolio value: {formatCurrency(currentValue)}. 
+        30-day change: {isPositive ? "up" : "down"} {formatCurrency(Math.abs(currentValue - costBasis))}.
+      </span>
       <div className="flex items-center justify-between mb-4">
         <div>
           <p className="text-xs text-muted-foreground">Current Value</p>
@@ -112,9 +126,9 @@ export function PerformanceChart({ quotes = {} }: PerformanceChartProps) {
       
       <div className="flex-1 min-h-0">
         <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={mockPerformanceData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+          <AreaChart data={mockPerformanceData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }} aria-hidden="true">
             <defs>
-              <linearGradient id="performanceGradient" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={`performanceGradient-${gradientId}`} x1="0" y1="0" x2="0" y2="1">
                 <stop 
                   offset="5%" 
                   stopColor={isPositive ? "#10b981" : "#ef4444"} 
@@ -160,7 +174,7 @@ export function PerformanceChart({ quotes = {} }: PerformanceChartProps) {
               dataKey="value"
               stroke={isPositive ? "#10b981" : "#ef4444"}
               strokeWidth={2}
-              fill="url(#performanceGradient)"
+              fill={`url(#performanceGradient-${gradientId})`}
             />
           </AreaChart>
         </ResponsiveContainer>
@@ -171,4 +185,4 @@ export function PerformanceChart({ quotes = {} }: PerformanceChartProps) {
       </p>
     </div>
   );
-}
+});
