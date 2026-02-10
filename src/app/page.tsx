@@ -6,13 +6,14 @@ import { Dashboard, AddWidgetModal } from "@/components/dashboard";
 import { AddHoldingForm } from "@/components/portfolio/AddHoldingForm";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { DashboardSkeleton } from "@/components/loading";
-import { useQuotes, useActivePortfolio } from "@/hooks";
+import { useQuotes, useActivePortfolio, useMounted } from "@/hooks";
 import { Plus, RefreshCw, LayoutGrid } from "lucide-react";
 import { ThemeToggle, SavedViews, PortfolioSwitcher, DataManagement } from "@/components/layout";
 
 export default function Home() {
   const [addHoldingOpen, setAddHoldingOpen] = useState(false);
   const [addWidgetOpen, setAddWidgetOpen] = useState(false);
+  const mounted = useMounted();
 
   const portfolio = useActivePortfolio();
 
@@ -45,7 +46,7 @@ export default function Home() {
               onClick={() => refetch()}
               disabled={isLoading || symbols.length === 0}
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw className={`h-4 w-4 mr-2 ${mounted && isLoading ? "animate-spin" : ""}`} />
               Refresh
             </Button>
             <Button size="sm" onClick={() => setAddHoldingOpen(true)}>

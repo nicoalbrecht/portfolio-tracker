@@ -1,10 +1,20 @@
 import { useStore } from "@/stores";
+import { useShallow } from "zustand/shallow";
 
-/**
- * Returns the currently active portfolio from the store.
- * Convenience hook that selects the active portfolio with proper memoization.
- * @returns The active portfolio or undefined if none selected
- */
 export function useActivePortfolio() {
-  return useStore((state) => state.getActivePortfolio());
+  const activePortfolioId = useStore((state) => state.activePortfolioId);
+  const portfolio = useStore(
+    useShallow((state) => {
+      const p = state.portfolios.find((p) => p.id === activePortfolioId);
+      if (!p) return undefined;
+      return {
+        id: p.id,
+        name: p.name,
+        currency: p.currency,
+        createdAt: p.createdAt,
+        holdings: p.holdings,
+      };
+    })
+  );
+  return portfolio;
 }

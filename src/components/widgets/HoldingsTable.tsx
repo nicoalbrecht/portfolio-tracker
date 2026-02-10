@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { EmptyState, PortfolioIcon } from "@/components/ui/empty-state";
 import { useStore } from "@/stores";
+import { useMounted } from "@/hooks";
 import { formatCurrency, formatShares, formatPercent } from "@/lib/formatters";
 import { Holding, Quote } from "@/types";
 import { Pencil, Trash2, ArrowUpDown } from "lucide-react";
@@ -57,6 +58,8 @@ type SortDirection = "asc" | "desc";
 
 export const HoldingsTable = memo(function HoldingsTable({ quotes = {}, onEdit }: HoldingsTableProps) {
   const { getActivePortfolio, deleteHolding } = useStore();
+  const mounted = useMounted();
+  
   const portfolio = getActivePortfolio();
   const holdings = useMemo(() => portfolio?.holdings ?? [], [portfolio?.holdings]);
 
@@ -142,6 +145,17 @@ export const HoldingsTable = memo(function HoldingsTable({ quotes = {}, onEdit }
     if (sortKey !== key) return "none";
     return sortDirection === "asc" ? "ascending" : "descending";
   }, [sortKey, sortDirection]);
+
+  if (!mounted) {
+    return (
+      <EmptyState
+        icon={<PortfolioIcon />}
+        title="No holdings yet"
+        description="Add your first ETF holding to get started tracking your portfolio"
+        className="py-12"
+      />
+    );
+  }
 
   if (holdings.length === 0) {
     return (

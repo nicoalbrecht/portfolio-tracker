@@ -2,6 +2,7 @@
 
 import { useRef } from "react";
 import { useStore } from "@/stores";
+import { useShallow } from "zustand/shallow";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -49,7 +50,7 @@ const selectExportData = (state: ReturnType<typeof useStore.getState>) => ({
 export function DataManagement() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const storeData = useStore(selectExportData);
+  const storeData = useStore(useShallow(selectExportData));
   const importState = useStore((state) => state.importState);
 
   const handleExport = () => {
