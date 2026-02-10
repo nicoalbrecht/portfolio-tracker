@@ -1,4 +1,4 @@
-# THIS IS FULLY VIBE CODED, NOT A SINGLE LOC REVIEWD
+# THIS IS FULLY VIBE CODED, NOT A SINGLE LOC REVIEWED!
 
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
