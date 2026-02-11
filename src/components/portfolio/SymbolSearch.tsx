@@ -4,13 +4,13 @@ import { useState, useEffect, useCallback } from "react";
 import { searchSymbols, SearchResult } from "@/lib/api";
 import {
   Combobox,
-  ComboboxContent,
   ComboboxEmpty,
   ComboboxInput,
   ComboboxItem,
   ComboboxList,
 } from "@/components/ui/combobox";
 import { Loader2 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 interface SymbolSearchProps {
   /** Current symbol value */
@@ -115,6 +115,8 @@ export function SymbolSearch({
     }
   }, [inputValue]);
 
+  const showDropdown = isOpen && (isLoading || results.length > 0);
+
   return (
     <Combobox
       value={selectedResult}
@@ -122,46 +124,59 @@ export function SymbolSearch({
       inputValue={inputValue}
       onInputValueChange={handleInputChange}
       items={results}
+      itemToStringLabel={(item) => (searchMode === "name" ? item.name : item.symbol)}
       itemToStringValue={(item) => (searchMode === "name" ? item.name : item.symbol)}
-      open={isOpen && (isLoading || results.length > 0)}
+      open={showDropdown}
       onOpenChange={handleOpenChange}
+      inline
     >
-      <ComboboxInput
-        placeholder={placeholder}
-        disabled={disabled}
-        aria-invalid={ariaInvalid}
-        showTrigger={false}
-        className="uppercase"
-      />
-      <ComboboxContent>
-        {isLoading ? (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-            <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
+      <div className="relative">
+        <ComboboxInput
+          placeholder={placeholder}
+          disabled={disabled}
+          aria-invalid={ariaInvalid}
+          showTrigger={false}
+          className="uppercase"
+        />
+        {showDropdown && (
+          <div className={cn(
+            "absolute top-full left-0 z-50 mt-1 w-full",
+            "bg-popover text-popover-foreground",
+            "rounded-md border shadow-md",
+            "max-h-60 overflow-auto"
+          )}>
+            {isLoading ? (
+              <div className="flex items-center justify-center py-4">
+                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                <span className="ml-2 text-sm text-muted-foreground">Searching...</span>
+              </div>
+            ) : (
+              <>
+                <ComboboxEmpty className="py-4 text-center text-sm text-muted-foreground">
+                  No results found.
+                </ComboboxEmpty>
+                <ComboboxList className="p-1">
+                  {(result, index) => (
+                    <ComboboxItem key={`${result.symbol}-${result.region}-${index}`} value={result}>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{result.symbol}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {result.type}
+                          </span>
+                        </div>
+                        <span className="text-sm text-muted-foreground truncate max-w-[300px]">
+                          {result.name}
+                        </span>
+                      </div>
+                    </ComboboxItem>
+                  )}
+                </ComboboxList>
+              </>
+            )}
           </div>
-        ) : (
-          <>
-            <ComboboxEmpty>No results found.</ComboboxEmpty>
-            <ComboboxList>
-              {(result, index) => (
-                <ComboboxItem key={`${result.symbol}-${result.region}-${index}`} value={result}>
-                  <div className="flex flex-col">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{result.symbol}</span>
-                      <span className="text-xs text-muted-foreground">
-                        {result.type}
-                      </span>
-                    </div>
-                    <span className="text-sm text-muted-foreground truncate max-w-[300px]">
-                      {result.name}
-                    </span>
-                  </div>
-                </ComboboxItem>
-              )}
-            </ComboboxList>
-          </>
         )}
-      </ComboboxContent>
+      </div>
     </Combobox>
   );
 }
