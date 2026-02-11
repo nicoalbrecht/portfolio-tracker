@@ -37,13 +37,15 @@ export function SymbolSearch({
   const [isOpen, setIsOpen] = useState(false);
 
   const prevValueRef = useRef(value);
+  const pendingSearchRef = useRef<string | null>(null);
 
   useEffect(() => {
     if (value !== prevValueRef.current) {
-      setInputValue(value);
-      setIsOpen(false);
-      if (value === "") {
+      if (pendingSearchRef.current !== value) {
+        setInputValue(value);
+        setIsOpen(false);
         setResults([]);
+        pendingSearchRef.current = null;
       }
     }
     prevValueRef.current = value;
@@ -53,6 +55,10 @@ export function SymbolSearch({
     const query = inputValue.trim();
     if (query.length < 1) {
       setResults([]);
+      return;
+    }
+
+    if (pendingSearchRef.current !== inputValue) {
       return;
     }
 
@@ -82,6 +88,7 @@ export function SymbolSearch({
         return;
       }
       const processed = searchMode === "symbol" ? newValue.toUpperCase() : newValue;
+      pendingSearchRef.current = processed;
       setInputValue(processed);
       onSymbolChange(processed);
     },
