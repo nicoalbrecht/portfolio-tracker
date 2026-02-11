@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,8 @@ import { useStore } from "@/stores";
 import { holdingSchema, HoldingFormData } from "@/lib/validators";
 import { formatCurrency } from "@/lib/formatters";
 import { toast } from "sonner";
+import { SymbolSearch } from "./SymbolSearch";
+import { SearchResult } from "@/lib/api";
 
 interface AddHoldingFormProps {
   open: boolean;
@@ -28,10 +30,11 @@ export function AddHoldingForm({ open, onOpenChange }: AddHoldingFormProps) {
   const [currentPrice] = useState<number | null>(null);
 
   const {
-    register,
     handleSubmit,
     reset,
     watch,
+    setValue,
+    register,
     formState: { errors, isSubmitting },
   } = useForm<HoldingFormData>({
     resolver: zodResolver(holdingSchema),
@@ -45,11 +48,43 @@ export function AddHoldingForm({ open, onOpenChange }: AddHoldingFormProps) {
     },
   });
 
+  const symbolValue = watch("symbol");
+  const nameValue = watch("name");
   const shares = watch("shares");
   const avgCostBasis = watch("avgCostBasis");
   const totalCost = shares && avgCostBasis ? shares * avgCostBasis : 0;
   const currentValue = shares && currentPrice ? shares * currentPrice : null;
   const gainLoss = currentValue && totalCost ? currentValue - totalCost : null;
+
+  const handleSymbolChange = useCallback(
+    (symbol: string) => {
+      setValue("symbol", symbol, { shouldValidate: symbol.length > 0 });
+    },
+    [setValue]
+  );
+
+  const handleSymbolResultSelect = useCallback(
+    (result: SearchResult) => {
+      setValue("symbol", result.symbol.toUpperCase(), { shouldValidate: true });
+      setValue("name", result.name, { shouldValidate: true });
+    },
+    [setValue]
+  );
+
+  const handleNameChange = useCallback(
+    (name: string) => {
+      setValue("name", name, { shouldValidate: name.length > 0 });
+    },
+    [setValue]
+  );
+
+  const handleNameResultSelect = useCallback(
+    (result: SearchResult) => {
+      setValue("symbol", result.symbol.toUpperCase(), { shouldValidate: true });
+      setValue("name", result.name, { shouldValidate: true });
+    },
+    [setValue]
+  );
 
   const onSubmit = (data: HoldingFormData) => {
     let portfolioId = activePortfolioId;
@@ -100,11 +135,12 @@ export function AddHoldingForm({ open, onOpenChange }: AddHoldingFormProps) {
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="symbol">Symbol *</Label>
-            <Input
-              id="symbol"
-              placeholder="VTI"
-              {...register("symbol")}
-              className="uppercase"
+            <SymbolSearch
+              value={symbolValue}
+              onSymbolChange={handleSymbolChange}
+              onResultSelect={handleSymbolResultSelect}
+              placeholder="Search by symbol (e.g., VTI)"
+              aria-invalid={!!errors.symbol}
             />
             {errors.symbol && (
               <p className="text-sm text-destructive">{errors.symbol.message}</p>
@@ -113,10 +149,13 @@ export function AddHoldingForm({ open, onOpenChange }: AddHoldingFormProps) {
 
           <div className="space-y-2">
             <Label htmlFor="name">Name *</Label>
-            <Input
-              id="name"
-              placeholder="Vanguard Total Stock Market ETF"
-              {...register("name")}
+            <SymbolSearch
+              value={nameValue}
+              onSymbolChange={handleNameChange}
+              onResultSelect={handleNameResultSelect}
+              placeholder="Search by company name"
+              searchMode="name"
+              aria-invalid={!!errors.name}
             />
             {errors.name && (
               <p className="text-sm text-destructive">{errors.name.message}</p>
