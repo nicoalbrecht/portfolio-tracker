@@ -98,29 +98,29 @@ export function SymbolSearch({
     (newValue: SearchResult | null) => {
       if (newValue) {
         isUserTypingRef.current = false;
-        const symbol = newValue.symbol.toUpperCase();
-        setInputValue(symbol);
+        const displayValue = searchMode === "name" ? newValue.name : newValue.symbol.toUpperCase();
+        setInputValue(displayValue);
         setSelectedResult(newValue);
-        onSymbolChange(symbol);
+        onSymbolChange(displayValue);
         onResultSelect?.(newValue);
         setIsOpen(false);
       }
     },
-    [onSymbolChange, onResultSelect]
+    [onSymbolChange, onResultSelect, searchMode]
   );
 
   const handleInputChange = useCallback(
     (newInputValue: string) => {
       isUserTypingRef.current = true;
-      const upperValue = newInputValue.toUpperCase();
-      setInputValue(upperValue);
+      const processedValue = searchMode === "symbol" ? newInputValue.toUpperCase() : newInputValue;
+      setInputValue(processedValue);
       setSelectedResult(null);
-      onSymbolChange(upperValue);
-      if (upperValue.length > 0) {
+      onSymbolChange(processedValue);
+      if (processedValue.length > 0) {
         setIsOpen(true);
       }
     },
-    [onSymbolChange]
+    [onSymbolChange, searchMode]
   );
 
   const handleOpenChange = useCallback((open: boolean) => {
@@ -150,7 +150,7 @@ export function SymbolSearch({
           disabled={disabled}
           aria-invalid={ariaInvalid}
           showTrigger={false}
-          className="uppercase"
+          className={searchMode === "symbol" ? "uppercase" : undefined}
         />
         {showDropdown && (
           <div className={cn(
