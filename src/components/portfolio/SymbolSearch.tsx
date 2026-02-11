@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { searchSymbols, SearchResult } from "@/lib/api";
 import {
   Combobox,
@@ -43,10 +43,16 @@ export function SymbolSearch({
   const [isLoading, setIsLoading] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [selectedResult, setSelectedResult] = useState<SearchResult | null>(null);
+  // Track if user is actively typing vs programmatic update
+  const isUserTypingRef = useRef(false);
 
+  // Sync external value changes (programmatic updates from other field)
   useEffect(() => {
     if (value !== inputValue) {
+      // Don't trigger search when value is set programmatically
+      isUserTypingRef.current = false;
       setInputValue(value);
+      setIsOpen(false); // Close dropdown on programmatic update
       if (value === "") {
         setSelectedResult(null);
         setResults([]);
@@ -55,7 +61,13 @@ export function SymbolSearch({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value]);
 
+  // Only search when user is actively typing
   useEffect(() => {
+    // Skip search if this wasn't triggered by user typing
+    if (!isUserTypingRef.current) {
+      return;
+    }
+
     const query = inputValue.trim();
     
     if (query.length < 1) {
@@ -68,7 +80,7 @@ export function SymbolSearch({
       try {
         const searchResults = await searchSymbols(query);
         setResults(searchResults);
-        if (searchResults.length > 0) {
+        if (searchResults.length > 0 && isUserTypingRef.current) {
           setIsOpen(true);
         }
       } catch (error) {
@@ -85,6 +97,7 @@ export function SymbolSearch({
   const handleValueChange = useCallback(
     (newValue: SearchResult | null) => {
       if (newValue) {
+        isUserTypingRef.current = false;
         const symbol = newValue.symbol.toUpperCase();
         setInputValue(symbol);
         setSelectedResult(newValue);
@@ -98,6 +111,7 @@ export function SymbolSearch({
 
   const handleInputChange = useCallback(
     (newInputValue: string) => {
+      isUserTypingRef.current = true;
       const upperValue = newInputValue.toUpperCase();
       setInputValue(upperValue);
       setSelectedResult(null);
