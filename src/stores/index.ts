@@ -1,10 +1,61 @@
 import { create } from "zustand";
-import { persist, createJSONStorage } from "zustand/middleware";
+import { persist, createJSONStorage, type StateStorage } from "zustand/middleware";
 import { createPortfolioSlice, PortfolioSlice } from "./portfolioSlice";
 import { createDashboardSlice, DashboardSlice } from "./dashboardSlice";
 import { createUISlice, UISlice } from "./uiSlice";
 
 const STORE_VERSION = 1;
+
+/**
+ * Defensive localStorage wrapper that handles QuotaExceededError gracefully.
+ * Falls back to in-memory storage if localStorage is full or unavailable.
+ */
+const createSafeStorage = (): StateStorage => {
+  const memoryFallback: Record<string, string> = {};
+  let usingFallback = false;
+
+  return {
+    getItem: (name: string): string | null => {
+      if (usingFallback) {
+        return memoryFallback[name] ?? null;
+      }
+      try {
+        return localStorage.getItem(name);
+      } catch {
+        return memoryFallback[name] ?? null;
+      }
+    },
+    setItem: (name: string, value: string): void => {
+      if (usingFallback) {
+        memoryFallback[name] = value;
+        return;
+      }
+      try {
+        localStorage.setItem(name, value);
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "QuotaExceededError") {
+          console.warn(
+            "localStorage quota exceeded. Falling back to memory storage. " +
+            "Clear localStorage in DevTools to restore persistence."
+          );
+          usingFallback = true;
+          memoryFallback[name] = value;
+        }
+      }
+    },
+    removeItem: (name: string): void => {
+      if (usingFallback) {
+        delete memoryFallback[name];
+        return;
+      }
+      try {
+        localStorage.removeItem(name);
+      } catch {
+        delete memoryFallback[name];
+      }
+    },
+  };
+};
 
 interface ImportableState {
   portfolios?: unknown[];
@@ -94,7 +145,7 @@ export const useStore = create<StoreState>()(
     {
       name: "etf-dashboard-storage",
       version: STORE_VERSION,
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => createSafeStorage()),
       partialize: (state) => ({
         portfolios: state.portfolios,
         activePortfolioId: state.activePortfolioId,
